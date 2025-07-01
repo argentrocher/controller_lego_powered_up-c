@@ -5,7 +5,7 @@ import sys
 import threading
 
 
-ip="70:B9:50:59:54:95"
+ip="70:B9:50:59:54:95" #vôtre ip/id de télécommande / your handset ip/id
 
 class HandsetController:
     def __init__(self):
