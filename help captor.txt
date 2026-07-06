@@ -1,0 +1,56 @@
+CAPTEUR distance couleur objet
+
+FRC script pour les noms avec commande >> 06 00 22 [port] 0[0-A] 00  (0 à A peut varier en fonction du capteur pris en charge et du nombre de mode)
+la valeur de var_local|t| est la valeur suivant 11 00 44 [port] 0[0-A] 00 ... dans la réponse (ex:434F4C4F52=COLOR).
+[[[{include(math+timelibrairy.frc)(m)}{var_local|t|="434F4C4F52"}{var_local|i|=1}{repeat||text_len("text(var_local|t|)")#2||{var_local|tt|="text(text_letters("text(var_local|t|)";var_local|i|;var_local|i|+1))"}{print("text(chr(m.int("text(var_local|tt|)";16)))")}{var_local|i|=var_local|i|+2}}]]]
+
+Donne les port pris en charge :
+- 0 = COLOR
+- 1 = PROX
+- 2 = COUNT
+- 3 = REFLT
+- 4 = AMBI
+- 5 = COL O   
+- 6 = RGB I
+- 7 = IR TX
+- 8 = SPEC 1
+- 9 = DEBUG
+- A = CALIB
+
+[port] = prise du capteur entre 0x00=A et 0x03=D (pour des boitiers à 4 prises)
+
+COL O -> color output ne prend que 5 couleurs (les autres sont éteint par défaut, pas de rgb possible)
+>> après 0A 00 41 [port] 05 01 00 00 00 00
+08 00 81 [port] 11 51 05 00 -> noir
+08 00 81 [port] 11 51 05 03 -> bleu
+08 00 81 [port] 11 51 05 05 -> vert
+08 00 81 [port] 11 51 05 09 -> rouge
+08 00 81 [port] 11 51 05 0A -> blanc
+
+IR TX -> controle l'infrarouge pour power fonction
+>> après 0A 00 41 [port] 07 01 00 00 00 00
+meilleur mode (2 moteur controle puissance voulu) -> pour voir autre mode: https://www.philohome.com/pf/LEGO_Power_Functions_RC_v120.pdf
+Ex: 09 00 81 [port] 11 51 07 00 04 (met à 0 les deux moteurs sur canal 1 du IR)
+09 00 81 [port] 11 51 07 [B][A] 0[N|4] avec N le numéro du port entre 0 et 3. le | signifie ou avec la valeur 4.
+B et A  doivent suivre les valeurs binaires suivantes convertit en hex: 
+0000 Float (stop)
+0001 PWM forward step 1
+0010 PWM forward step 2
+0011 PWM forward step 3
+0100 PWM forward step 4
+0101 PWM forward step 5
+0110 PWM forward step 6
+0111 PWM forward step 7
+1000 Brake then float
+1001 PWM backward step 7
+1010 PWM backward step 6
+1011 PWM backward step 5
+1100 PWM backward step 4
+1101 PWM backward step 3
+1110 PWM backward step 2
+1111 PWM backward step 1
+
+Pour les autres mode (DEBUG et CALIB inconnu):
+0A 00 41 [port] [tipe] 01 00 00 00 [notificationON/OFF] 
+[tipe] peut être 00=couleur 01=distance 02=passage 03=lumière réfléchie, 04=lumière ambiante, 06=couleurRAW
+pour voir les valeur [notificationON=0X01] et arrêter même commande avec [notificationOFF=0X00] 
