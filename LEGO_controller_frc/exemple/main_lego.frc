@@ -1,0 +1,64 @@
+FRC
+
+$//A copier dans un projet//$
+
+#init[[[
+{var_local|r|=dll|frc_bridge_controller_lego|[[void;int]set_err_dll(0)]} $//ne pas afficher de message  d'erreur depuis la dll (0) sinon autre valeur affiche//$
+{var_local|r|=dll|frc_bridge_controller_lego|[[void;int]set_mode(3)])} $//bit1: creer new process à chaque event (0) ou  event sur la variable global (1) |bit2: pile (0) ou file (1) |bit3: console sur pipe (0) ou event sur la variable global avec PROMPT=... (1)//$
+{var_local|size_resp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+$//On a définit le mode ne créer pas d'autres instances utilise la pile de variable global on attend donc les events en boucle infini//$
+$//Il est aussi possible d'attendre une entré spécifique avec wait_event_startswith(char) ou d'attendre un temps donné avec wait_event(int non null en miliseconde)//$
+{repeat||endless||
+{var_local|cmp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+{if||var_local|cmp|||?=||var_local|size_resp|||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[int;int]wait_event(0)])}
+	{if!||var_local|r|||{break}}
+	{var_local|cmp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+}
+{var_local|respnum|=var_local|cmp|-var_local|size_resp|}
+$//analyse de reponse print (exemple a chager)//$
+{repeat||var_local|respnum|||
+	{var_local|content|="text(dll|frc_bridge_controller_lego|[[char;void]pop_response()])"}
+	{print("-> text(var_local|content|)")}
+}
+{var_local|size_resp|=var_local|cmp|-var_local|respnum|} $//-respnum car on a pop ce nombre de fois//$
+}
+]]]
+
+
+?func.send_request(var_local|re|;)[[[
+{var_local|compteur|=0}
+{repeat||endless||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[int;char]write_data("text(var_local|re|)")]}
+	{if?||var_local|r|||
+		{break}
+	}
+	{var_local|compteur|=++}
+	{if||var_local|compteur|||>||10||
+		{return(0)}
+	}
+	{sleep(5)}
+}
+{return(1)}
+]]]
+
+$//exemple de requete à send_request//$
+$//{var_local|r|=send_request("? text(var_local|content|)")}
+{if!||var_local|r|||{print("send_request locked !")}}//$
+
+
+$//exemple simple qui creer un nouveau process à chaque fois (plus rapide mais plus complexe a gérer) ! wait_event ne marche pas, vous pouvez comme même utiliser pop_response et push_response entre les diférents processus créer si besoins//$
+
+#test_init[[[{print("hello")}{var_local|r|=dll|frc_bridge_controller_lego|[[int;char]write_data("connexion_list")]}{print("result "var_local|r|)}]]]
+
+#test_init2[[[
+{var_local|arg|="text([main_arg])"}
+{print("GET text(var_local|arg|)")}
+{var_local|r|=send_request("? text(var_local|arg|)")}
+{print("IS "var_local|r|)}
+{var_local|r|="text(dll|frc_bridge_controller_lego|[[int;char]push_response("text(var_local|arg|)")])"}
+{print("A text(var_local|r|)")}
+{sleep(10)}
+{var_local|r|="text(dll|frc_bridge_controller_lego|[[char;void]pop_response()])"}
+{print("B text(var_local|r|)")}
+]]]
