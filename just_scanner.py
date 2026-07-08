@@ -24,5 +24,5 @@ async def scan_lego_hubs():
             print(f"  Raw bytes: {adv_data.hex()}")
             print(f"  Binaire: {' '.join(f'{byte:08b}' for byte in adv_data)}")
 
-# Exécute le scan
+
 asyncio.run(scan_lego_hubs())
