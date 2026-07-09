@@ -1,0 +1,416 @@
+FRC
+
+$//
+sur technic hub, barrières fermées au départ
+PORT :
+- A = detector color distance
+- B = motor tacho
+- C = detector color distance
+- D = led (clignotante du passage à niveau)
+
+Commande :
+- CONNECT_PASSAGE_NIVEAU=id
+- DISCONNECT_PASSAGE_NIVEAU
+- CLOSE_PASSAGE_NIVEAU
+- OPEN_PASSAGE_NIVEAU
+
+sur move hub, aiguillage ouvert au départ
+PORT :
+- C = motor tacho (0°=open 810°=close)
+- D = detector color distance
+
+Commande :
+- CONNECT_AIGUILLAGE=id
+- DISCONNECT_AIGUILLAGE
+- CLOSE_AIGUILLAGE
+- OPEN_AIGUILLAGE
+//$
+
+#init[[[
+{var_local|r|=dll|frc_bridge_controller_lego|[[void;int]set_err_dll(0)]} 
+{var_local|r|=dll|frc_bridge_controller_lego|[[void;int]set_mode(7)])} $//pour ne pas voir les requêtes de réponse du pipe (ici move hub), mettre 23//$
+{var_local|size_resp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+{var|index|=0}
+{var|index2|=0}
+{var||}
+{repeat||endless||
+{var_local|cmp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+{if||var_local|cmp|||?=||var_local|size_resp|||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[int;int]wait_event(0)])}
+	{if!||var_local|r|||{break}}
+	{var_local|cmp|=dll|frc_bridge_controller_lego|[[int;void]get_response_count()])}
+}
+{var_local|respnum|=var_local|cmp|-var_local|size_resp|}
+{repeat||var_local|respnum|||
+	{var_local|content|="text(dll|frc_bridge_controller_lego|[[char;void]pop_response()])"}
+	{if?||text_eval("text(var_local|content|)";/=;"PROMPT=SEND=")||
+		{var_local|content|="text(text_letters("text(var_local|content|)";13;-1))"}
+		{var_local|r|=send_request("text(var_local|content|)")}
+		{if!||var_local|r|||{print("send_request locked !")}}
+		{continue}
+	}
+	{aiguillage_passage_niveau("text(var_local|content|)")}
+}
+{var_local|size_resp|=var_local|cmp|-var_local|respnum|}
+}
+]]]
+
+
+?func.send_request(var_local|re|;)[[[
+{var_local|compteur|=0}
+{repeat||endless||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[int;char]write_data("text(var_local|re|)")]}
+	{if?||var_local|r|||
+		{break}
+	}
+	{var_local|compteur|=++}
+	{if||var_local|compteur|||>||10||
+		{return(0)}
+	}
+	{sleep(5)}
+}
+{return(1)}
+]]]
+
+?func.light(var_local|lock|)[[[
+{var_local|light|=0}
+{if!||var_local|lock|||
+	{var_local|lock|=3}
+}
+{repeat||endless||
+	{if||var|index|||!=||var_local|lock|||{break}}
+	$//{print(var|index|" / "var_local|lock|)}//$
+	{if!||var_local|light|||
+		{var_local|light|=1}
+		{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 03 11 51 00 50")}
+	||else||
+		{var_local|light|=0}
+		{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 03 11 51 00 00")}
+	}
+	{sleep(1000)}
+}
+{if(?||var_local|light||| and ?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID|)")]||)
+	{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 03 11 51 00 00")}
+}
+]]]
+
+?func.close_passage_niveau(var_local|color|;)[[[
+{if||var|index|||?=||0||
+	{print("pas CONNECT !")}
+	{return(0)}
+}
+{if||var|index|||?=||1||
+	{print("pas INIT !")}
+	{return(0)}
+}
+{if||var|index|%2||?=||1||
+	{print("la barriere est ferme !")}
+	{return(0)}
+}
+{if||text_len("text(var_local|color|)")||>||1||
+	{print("color code invalide !")}
+	{return(0)}
+}
+{var|index|=++}
+{threading([[[{var_local|i|=var|index|}{light(var_local|i|)}]]])}
+{sleep(500)}
+{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 32 11 51 00 0text(var_local|color|)[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:0;speed:15;maxpower:30;brake:1")}
+{return(1)}
+]]]
+
+?func.open_passage_niveau(var_local|color|;)[[[
+{if||var|index|||?=||0||
+	{print("pas CONNECT !")}
+	{return(0)}
+}
+{if||var|index|||?=||1||
+	{print("pas INIT !")}
+	{return(0)}
+}
+{if||var|index|%2||?=||0||
+	{print("la barriere est ouverte !")}
+	{return(0)}	
+}
+{if||text_len("text(var_local|color|)")||>||1||
+	{print("color code invalide !")}
+	{return(0)}
+}
+{var|index|=--}
+{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 32 11 51 00 0text(var_local|color|)[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:55;speed:35;maxpower:50;brake:1")}
+{return(1)}
+]]]
+
+?func.close_aiguillage(var_local|color|;)[[[
+{if||var|index2|||?=||0||
+	{print("pas CONNECT !")}
+	{return(0)}
+}
+{if||var|index2|||?=||1||
+	{print("pas INIT !")}
+	{return(0)}
+}
+{if||var|index2|%2||?=||0||
+	{print("l'aiguillage est ferme !")}
+	{return(0)}
+}
+{if||text_len("text(var_local|color|)")||>||1||
+	{print("color code invalide !")}
+	{return(0)}
+}
+{var|index2|=--}
+{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 0text(var_local|color|)[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID2|);port:C;angle:810;speed:45;maxpower:55;brake:1")}
+{return(1)}
+]]] 
+
+?func.open_aiguillage(var_local|color|;)[[[
+{if||var|index2|||?=||0||
+	{print("pas CONNECT !")}
+	{return(0)}
+}
+{if||var|index2|||?=||1||
+	{print("pas INIT !")}
+	{return(0)}
+}
+{if||var|index2|%2||?=||1||
+	{print("l'aiguillage est ouvert !")}
+	{return(0)}
+}
+{var|index2|=++}
+{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 0text(var_local|color|)[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID2|);port:C;angle:0;speed:45;maxpower:55;brake:1")}
+{return(1)}
+]]]
+
+?func.aiguillage_passage_niveau(var_local|arg|;)[[[
+{if?||text_eval("text(var_local|arg|)";\=;"[/n]")||
+	{var_local|arg|="text(text_letters("text(var_local|arg|)";1;-2))"}
+}
+{if?||text_eval("text(var_local|arg|)";/=;"PROMPT=CONNECT_PASSAGE_NIVEAU=")||
+	{var_local|arg|="text(text_letters("text(var_local|arg|)";31;-1))"}
+	{if!||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var_local|arg|)")]||
+		{print("addr text(var_local|arg|) est invalide !")}
+		{return(0)}
+	}
+	{if?||text_eval("text(var_local|arg|)";?=;"text(var|hubID2|)")||
+		{print("addr text(var_local|arg|) est deja utilise !")}
+		{return(0)}
+	}
+	{if?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID|)")]||
+		{print("deja connecte a PASSAGE_NIVEAU !")}
+		{return(0)}
+	}
+	{var|statebutton|=0}
+	{var|hubID|="text(var_local|arg|)"}
+	{var|index|=1}
+	{var_local|r|=send_request("start_connexion:text(var_local|arg|)")}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";/=;"ERROR: Echec de la connexion a: ")||
+	{var_local|arg|="text(text_letters("text(var_local|arg|)";text_len("text(ERROR: Echec de la connexion a: )")+1;-1))"}
+	{if?||text_eval("text(var_local|arg|)";?=;"text(var|hubID|)")||
+		{var|hubID|=""}
+		{var|index|=0}
+	}
+	{if?||text_eval("text(var_local|arg|)";?=;"text(var|hubID2|)")||
+		{var|hubID2|=""}
+		{var|index2|=0}
+	}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=DISCONNECT_PASSAGE_NIVEAU")||
+	{if?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID|)")]||
+		{var|index|=0}
+		{var_local|r|=send_request("command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:0;speed:15;maxpower:30;brake:1")}
+		{sleep(50)}
+		{var_local|r|=send_request("command_output:text(var|hubID|);05 00 01 02 03")}
+		{sleep(2000)}
+		{var_local|r|=send_request("Switch_Off_Hub:text(var|hubID|)")}
+		{var|hubID|=""}
+	}
+	{return(1)}
+}
+{if(||var|index|||?=||1|| and ?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID|)")]||)
+	{threading([[[
+		{sleep(2000)}
+		$//Envoie de plusieurs commandes en même temps avec [/n] comme séparateur (ecoute bouton | light green | ouvrir barriere) //$
+		{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 32 11 51 00 06[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:60;speed:35;maxpower:50;brake:1")}
+		{sleep(50)}
+		{var_local|r|=send_request("command_output:text(var|hubID|);05 00 01 02 02")}
+		{var|index|=2}
+	]]])}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=CLOSE_PASSAGE_NIVEAU")||
+	{close_passage_niveau("1")}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";/=;"PROMPT=OPEN_PASSAGE_NIVEAU")||
+	{open_passage_niveau("6")}
+	{return(1)}
+}
+$//boutton press//$
+{if?||text_eval("text(var_local|arg|)";/=;"text(var|hubID|): 060001020601")||
+	{var|statebutton|=time_delay()}
+	{return(1)}
+}
+$//boutton release//$
+{if(?||text_eval("text(var_local|arg|)";/=;"text(var|hubID|): 060001020600")|| and ?||var|statebutton|||)
+	{if||time_delay(var|statebutton|)||>||1.5||
+		{if(||var|index|||?=||2|| or ||var|index|||?=||3||)
+			{var|index|=4}
+			{print("MODE CHANGED = DETECTOR")}
+			{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 32 11 51 00 03[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:55;speed:35;maxpower:50;brake:1")}
+			{sleep(50)}
+			{var_local|r|=send_request("command_output:text(var|hubID|);0A 00 41 00 01 01 00 00 00 01[/n]command_output:text(var|hubID|);0A 00 41 02 01 01 00 00 00 01")}
+			{return(1)}
+		}
+		{if(||var|index|||>||3||)
+			{var|index|=2}
+			{print("MODE CHANGED = MANUAL")}
+			{var_local|r|=send_request("command_output:text(var|hubID|);08 00 81 32 11 51 00 06[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID|);port:B;angle:55;speed:35;maxpower:50;brake:1")}
+			{sleep(50)}
+			{var_local|r|=send_request("command_output:text(var|hubID|);0A 00 41 00 01 01 00 00 00 00[/n]command_output:text(var|hubID|);0A 00 41 02 01 01 00 00 00 00")}
+			{return(1)}
+		}
+	}
+	{if||var|index|||?=||2||
+		{close_passage_niveau("1")}
+		{return(1)}
+	}
+	{if||var|index|||?=||3||
+		{open_passage_niveau("6")}
+	}
+	{return(1)}
+}
+{if(||var|index|||?=||4|| and (?||text_eval("text(var_local|arg|)";/=;"text(var|hubID|): 050045020")|| or ?||text_eval("text(var_local|arg|)";/=;"text(var|hubID|): 050045000")||))
+	{threading([[[
+	{close_passage_niveau("2")}
+	{sleep(10000)}
+	$//{print(">>>>>>>> "var|index|)}//$
+	{if||var|index|||?=||5||
+		{open_passage_niveau("3")}
+	}
+	]]])}
+	{return(1)}
+}
+$//aiguillage//$
+{if?||text_eval("text(var_local|arg|)";/=;"PROMPT=CONNECT_AIGUILLAGE=")||
+	{var_local|arg|="text(text_letters("text(var_local|arg|)";27;-1))"}
+	{if!||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var_local|arg|)")]||
+		{print("addr text(var_local|arg|) est invalide !")}
+		{return(0)}
+	}
+	{if?||text_eval("text(var_local|arg|)";?=;"text(var|hubID|)")||
+		{print("addr text(var_local|arg|) est deja utilise !")}
+		{return(0)}
+	}
+	{if?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID2|)")]||
+		{print("deja connecte a AIGUILLAGE !")}
+		{return(0)}
+	}
+	{var|statebutton2|=0}
+	{var|hubID2|="text(var_local|arg|)"}
+	{var|index2|=1}
+	{var_local|r|=send_request("start_connexion:text(var_local|arg|)")}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=DISCONNECT_AIGUILLAGE")||
+	{if?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID2|)")]||
+		{var|index2|=0}
+		{var_local|r|=send_request("command_absolute_position_speed_control_motor_tacho:text(var|hubID2|);port:C;angle:0;speed:45;maxpower:50;brake:1")}
+		{sleep(50)}
+		{var_local|r|=send_request("command_output:text(var|hubID2|);05 00 01 02 03")}
+		{sleep(2300)}
+		{var_local|r|=send_request("Switch_Off_Hub:text(var|hubID2|)")}
+		{var|hubID2|=""}
+	}
+	{return(1)}
+}
+{if(||var|index2|||?=||1|| and ?||dll|frc_bridge_controller_lego|[[int;char]isvalid_mac_addr("text(var|hubID2|)")]||)
+	{var|index2|=2}
+	{threading([[[
+		{sleep(2300)}
+		$//Envoie de plusieurs commandes en même temps avec [/n] comme séparateur (ecoute bouton | light red | fermer aiguillage) //$
+		{var_local|r|=send_request("command_output:text(var|hubID2|);05 00 01 02 02")}
+		{sleep(50)}
+		{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 01[/n]command_absolute_position_speed_control_motor_tacho:text(var|hubID2|);port:C;angle:810;speed:45;maxpower:55;brake:1")}
+		{sleep(1)}
+	]]])}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=CLOSE_AIGUILLAGE")||
+	{close_aiguillage("1")}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=OPEN_AIGUILLAGE")||
+	{open_aiguillage("6")}
+	{return(1)}
+}
+$//boutton press//$
+{if?||text_eval("text(var_local|arg|)";/=;"text(var|hubID2|): 060001020601")||
+	{var|statebutton2|=time_delay()}
+	{return(1)}
+}
+$//boutton release//$
+{if(?||text_eval("text(var_local|arg|)";/=;"text(var|hubID2|): 060001020600")|| and ?||var|statebutton2|||)
+	{if||time_delay(var|statebutton2|)||>||1.5||
+		{var|statebutton2|=0}
+		{if(||var|index2|||?=||2|| or ||var|index2|||?=||3||)
+			{print("MODE CHANGED = DETECTOR")}
+			{var|index2|=var|index2|+2}
+			{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 03[/n]command_output:text(var|hubID2|);0A 00 41 03 01 01 00 00 00 01")}
+			{return(1)}
+		}
+		{if(||var|index2|||?=||4|| or ||var|index2|||?=||5||)
+			{print("MODE CHANGED = NORMAL")}
+			{if||var|index2|||?=||4||[[2]]
+				{var|index2|=2}
+				{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 01")}
+				{var|index2|=3}
+				{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 06")}
+			}
+			{var_local|r|=send_request("command_output:text(var|hubID2|);0A 00 41 03 01 01 00 00 00 00")}
+		}
+		{return(1)}
+	}
+	{if||var|index2|||?=||2||
+		{open_aiguillage("6")}
+		{return(1)}
+	}
+	{if||var|index2|||?=||3||
+		{close_aiguillage("1")}
+	}
+	{return(1)}
+}
+{if(||var|index2|||?=||4|| and ?||text_eval("text(var_local|arg|)";/=;"text(var|hubID2|): 050045030")||)
+	{var|index2|=6}
+	{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 02")}
+	{threading([[[
+	{sleep(5000)}
+	{if||var|index2|||?=||6||
+		{var|index2|=4}
+		{open_aiguillage("3")}
+	}
+	]]])}
+	{return(1)}
+}
+{if(||var|index2|||?=||5|| and ?||text_eval("text(var_local|arg|)";/=;"text(var|hubID2|): 050045030")||)
+	{var|index2|=6}
+	{var_local|r|=send_request("command_output:text(var|hubID2|);08 00 81 32 11 51 00 02")}
+	{threading([[[
+	{sleep(5000)}
+	{if||var|index2|||?=||6||
+		{var|index2|=5}
+		{close_aiguillage("3")}
+	}
+	]]])}
+	{return(1)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=DEBUG")||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[int;void]is_read_data()]}
+	{close_threading()}
+	{print(var_local|r|)}
+}
+{if?||text_eval("text(var_local|arg|)";?=;"PROMPT=MARK_READ_DATA")||
+	{var_local|r|=dll|frc_bridge_controller_lego|[[void;void]mark_read_data()]}
+}
+]]]
